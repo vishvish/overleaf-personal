@@ -1,32 +1,30 @@
 # Your own Overleaf
 
-A private, turnkey Overleaf Community Edition setup for independent personal
+A turnkey Overleaf Community Edition setup for independent personal
 installations. The application image includes full TeX Live and supports Apple
 Silicon / ARM64 and Intel / AMD64. A launcher manages Overleaf, MongoDB and Redis
 as one Docker Compose application.
 
 Each installation creates its own administrator account, project storage and
-private configuration. You need read access to this repository and the
-[private container package](https://github.com/users/vishvish/packages/container/package/overleaf-personal).
+private configuration. The source and
+[container image](https://github.com/users/vishvish/packages/container/package/overleaf-personal)
+are public. No GitHub account, token or registry login is required to run it.
 
 ## Start
 
 Install and open OrbStack or Docker Desktop on macOS, or Docker Engine with
 Compose 2.20 or newer on Linux. Windows users can use WSL2 with Docker Desktop
 integration. Then download the ZIP from [Releases](https://github.com/vishvish/overleaf-personal/releases)
-or clone the repository using your normal GitHub authentication:
+or clone the repository:
 
 ```sh
 git clone https://github.com/vishvish/overleaf-personal.git
 cd overleaf-personal
-./overleaf login
 ./overleaf start
 ```
 
-For the registry login, use your GitHub username and a classic personal access
-token with `read:packages` at the password prompt. Your GitHub account must have
-read permission for the private package. The [installation guide](docs/BUNDLE-README.md)
-includes the token setup link and full requirements.
+Docker downloads the public images automatically. See the
+[installation guide](docs/BUNDLE-README.md) for full requirements and configuration.
 
 On first use, open <http://localhost:8080/launchpad> to create your administrator
 account. Later visits use <http://localhost:8080>. The first image download is
@@ -39,7 +37,7 @@ several gigabytes.
 ./overleaf start
 ```
 
-On macOS, after the initial registry sign-in, the included **Start Overleaf.command**
+On macOS, the included **Start Overleaf.command**
 and **Stop Overleaf.command** files provide the same operations from Finder.
 Use `./overleaf status` or `./overleaf logs` for diagnostics.
 

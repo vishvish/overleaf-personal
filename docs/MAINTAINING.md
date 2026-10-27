@@ -1,14 +1,14 @@
-# Maintaining the private release
+# Maintaining the release
 
 The application image is published at `ghcr.io/vishvish/overleaf-personal`.
 `release.lock` records its combined digest, architecture-specific digests,
 upstream source revision, source patch checksum and database image references.
 `image.txt` and `images.env` supply the same references to fresh installations.
 
-Repository access and private-package access are separate permissions. Grant
-friends **Read** access to the repository and to the GHCR package. They use their
-own GitHub credentials for downloads and create their own Overleaf account on
-their computer.
+The repository and GHCR package are public. Users can clone or download the
+bundle and pull its images anonymously. Each person creates their own Overleaf
+account on their computer. Publishing new image versions still requires your
+maintainer credentials; those credentials are kept outside the bundle.
 
 ## Rebuild the application
 
@@ -47,14 +47,14 @@ Individual platform manifests are pushed explicitly because GHCR rejected the
 original Docker push containing its provenance/index combination. The platform
 images and the combined ARM64/AMD64 index were accepted.
 
-Confirm both platforms and the package's private visibility before distributing
+Confirm both platforms and anonymous image access before distributing
 a release. Record the combined and individual digests in `release.lock`; update
 `image.txt`, `images.env` and the source-information snapshot as appropriate.
 
 ## Package and publish the ZIP
 
 ```sh
-./script/overleaf-package --output dist/overleaf-personal-2026-10-27.zip
+./script/overleaf-package --output dist/overleaf-personal-2026-10-27.1.zip
 ```
 
 The packager defaults to the image in `release.lock`, validates the patch
@@ -75,5 +75,5 @@ The saved `.env` still selects the previous image pins. Review a new release,
 stop Overleaf, update the image references in `.env`, then start it again. Retain
 the invite-token secret, Compose project name and data volumes.
 
-The earlier public `suckerpunch/overleaf-ce-arm64` Docker Hub image remains a
-separate publication; this repository and its GHCR package are private.
+The earlier `suckerpunch/overleaf-ce-arm64` Docker Hub image remains a separate
+publication. This distribution uses the public multi-platform GHCR image.

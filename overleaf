@@ -19,12 +19,12 @@ Usage: ./overleaf [start|stop|status|logs|setup|login|pull|config|url]
   status  Show the installation's containers
   logs    Follow service logs (Ctrl-C leaves Overleaf running)
   setup   Create private local configuration, once
-  login   Sign in to this release's container registry
+  login   Optional registry sign-in for custom private images
   pull    Download the pinned release images
   config  Check configuration without displaying secrets
   url     Print the configured browser URL
 
-On first use: ./overleaf login, then ./overleaf start.
+On first use: ./overleaf start. No GitHub token is required.
 EOF
     exit 0 ;;
   start|stop|status|logs|setup|login|pull|config|url) ;;
@@ -149,7 +149,7 @@ case "$action" in
     echo "Starting your Overleaf installation. The first download is several gigabytes."
     if ! "${compose[@]}" up -d --wait --wait-timeout 300; then
       echo "Startup did not complete. Run ./overleaf logs for details." >&2
-      echo "For private image access errors, run ./overleaf login with an authorized account." >&2
+      echo "For image download errors, check your network connection and registry availability." >&2
       exit 1
     fi
     site="$(setting OVERLEAF_SITE_URL)"

@@ -15,23 +15,16 @@ appropriate image automatically.
 3. Open a terminal in that folder and run:
 
    ```sh
-   ./overleaf login
    ./overleaf start
    ```
 
-   Use your own account with permission to download the private image. The
-   registry name comes from this release's `image.txt`. Registry access must
-   be granted by the person sharing this release.
-   For GitHub Container Registry (`ghcr.io`), enter your GitHub username and a
-   [classic personal access token with `read:packages`](https://github.com/settings/tokens/new?scopes=read:packages&description=Overleaf%20image%20downloads)
-   at Docker's password prompt. Your GitHub account also needs read access to
-   the private package. Docker stores this login separately from the bundle.
+   The images are public. No GitHub account, token or registry login is required.
 4. Open <http://localhost:8080/launchpad> and create your own administrator
    account. For later visits, use <http://localhost:8080>.
 
 The first download is several gigabytes. The launcher waits for Overleaf to
-be ready before printing its URL. On macOS, after the initial registry sign-in,
-you can double-click **Start Overleaf.command** to start it and open your browser.
+be ready before printing its URL. On macOS, you can double-click
+**Start Overleaf.command** to start it and open your browser.
 
 ## Start and stop
 
@@ -91,9 +84,9 @@ versions. To install a newer release, keep your `.env` and volumes and review
 the release's image references before updating them; pulling alone does not
 select a newer release.
 
-If the private image cannot be downloaded, run `./overleaf login` and check that
-your account has access. If startup fails, `./overleaf logs` shows the service
-logs. `./overleaf config` checks the configuration without printing secrets.
+If image downloads fail, check your network connection and that Docker is
+running. If startup fails, `./overleaf logs` shows the service logs.
+`./overleaf config` checks the configuration without printing secrets.
 
 This is a community-built Overleaf image. Its upstream source and build patch
 are documented in `SOURCE.md`, with the upstream license in `LICENSE`.
