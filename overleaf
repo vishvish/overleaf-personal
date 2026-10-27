@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+bundle_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+action="${1:-start}"
+if [[ $# -gt 0 ]]; then shift; fi
+if [[ $# -gt 0 ]]; then
+  echo "Unexpected arguments. Run ./overleaf help." >&2
+  exit 2
+fi
+
+case "$action" in
+  help|-h|--help)
+    cat <<'EOF'
+Usage: ./overleaf [start|stop|status|logs|setup|login|pull|config|url]
+
+  start   Start your Overleaf installation and wait until it is ready
+  stop    Stop it while keeping all projects and accounts
+  status  Show the installation's containers
+  logs    Follow service logs (Ctrl-C leaves Overleaf running)
+  setup   Create private local configuration, once
+  login   Sign in to this release's container registry
+  pull    Download the pinned release images
+  config  Check configuration without displaying secrets
+  url     Print the configured browser URL
+
+On first use: ./overleaf login, then ./overleaf start.
+EOF
+    exit 0 ;;
+  start|stop|status|logs|setup|login|pull|config|url) ;;
+  *) echo "Unknown command: $action. Run ./overleaf help." >&2; exit 2 ;;
+esac
+
+fail() { echo "$*" >&2; exit 1; }
+
+setup() {
+  if [[ -L "$bundle_root/.env" ]]; then
+    fail "Refusing a symbolic link for the private .env file."
+  fi
+  if [[ -e "$bundle_root/.env" ]]; then
+    [[ -f "$bundle_root/.env" ]] || fail ".env must be a regular file."
+    chmod 600 "$bundle_root/.env"
+    return
+  fi
+  [[ -f "$bundle_root/image.txt" && -f "$bundle_root/images.env" ]] ||
+    fail "This release is incomplete: image.txt or images.env is missing."
+  local image port project site secret temporary
+  image="$(cat "$bundle_root/image.txt")"
+  [[ "$image" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$ ]] || fail "Invalid release image reference."
+  port="${OVERLEAF_PORT:-8080}"
+  [[ "$port" =~ ^[0-9]{1,5}$ ]] || fail "OVERLEAF_PORT must be a port number."
+  (( 10#$port >= 1 && 10#$port <= 65535 )) || fail "OVERLEAF_PORT must be between 1 and 65535."
+  project="${COMPOSE_PROJECT_NAME:-overleaf-personal}"
+  [[ "$project" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "Invalid COMPOSE_PROJECT_NAME."
+  site="${OVERLEAF_SITE_URL:-http://localhost:$port}"
+  [[ "$site" =~ ^https?://[^[:space:]\#\$\=]+$ ]] || fail "OVERLEAF_SITE_URL must be an HTTP or HTTPS URL without spaces."
+  umask 077
+  secret="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+  [[ ${#secret} -eq 64 ]] || fail "Unable to generate the installation secret."
+  temporary="$(mktemp "$bundle_root/.env.XXXXXX")"
+  trap '[[ -z "${temporary:-}" ]] || rm -f "$temporary"' EXIT
+  {
+    printf '# Private installation settings. Keep this file with your backups.\n'
+    printf 'COMPOSE_PROJECT_NAME=%s\nOVERLEAF_IMAGE=%s\n' "$project" "$image"
+    cat "$bundle_root/images.env"
+    printf '\nOVERLEAF_LISTEN_IP=127.0.0.1\nOVERLEAF_PORT=%s\nOVERLEAF_SITE_URL=%s\n' "$port" "${site%/}"
+    printf 'OVERLEAF_INVITE_TOKEN_SECRET=%s\n' "$secret"
+  } > "$temporary"
+  # A hard link creates .env without overwriting a concurrent setup's result.
+  if ! ln "$temporary" "$bundle_root/.env" 2>/dev/null; then
+    fail ".env appeared during setup. Run the command again."
+  fi
+  rm -f "$temporary"
+  temporary=""
+  trap - EXIT
+  echo "Created your private configuration in .env."
+}
+
+setting() {
+  local key value
+  while IFS='=' read -r key value; do
+    if [[ "$key" == "$1" ]]; then printf '%s\n' "$value"; return 0; fi
+  done < "$bundle_root/.env"
+  return 1
+}
+
+case "$action" in
+  start|setup|login|pull) setup ;;
+  *)
+    [[ -f "$bundle_root/.env" && ! -L "$bundle_root/.env" ]] ||
+      fail "Run ./overleaf setup first."
+    ;;
+esac
+[[ "$action" != setup ]] || exit 0
+
+if [[ "$action" == url ]]; then
+  setting OVERLEAF_SITE_URL
+  exit 0
+fi
+
+command -v docker >/dev/null 2>&1 || fail "Install OrbStack or Docker with Docker Compose first."
+
+if [[ "$action" == login ]]; then
+  release_image="$(setting OVERLEAF_IMAGE)"
+  registry="${release_image%%/*}"
+  case "$registry" in
+    *.*|*:*|localhost) ;;
+    *) registry=docker.io ;;
+  esac
+  exec docker login "$registry"
+fi
+
+compose_version="$(docker compose version --short 2>/dev/null)" || fail "Docker Compose is required."
+IFS=. read -r compose_major compose_minor compose_patch <<< "${compose_version#v}"
+[[ "$compose_major" =~ ^[0-9]+$ && "${compose_minor:-}" =~ ^[0-9]+$ ]] || fail "Cannot determine the Docker Compose version."
+if (( compose_major < 2 || (compose_major == 2 && compose_minor < 20) )); then
+  fail "Docker Compose 2.20 or newer is required."
+fi
+
+if [[ -n "${DOCKER_CONTEXT:-}" ]]; then
+  docker_endpoint="$(docker context inspect "$DOCKER_CONTEXT" --format '{{.Endpoints.docker.Host}}')"
+elif [[ -n "${DOCKER_HOST:-}" ]]; then
+  docker_endpoint="$DOCKER_HOST"
+else
+  docker_endpoint="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
+fi
+case "$docker_endpoint" in
+  unix://*|npipe://*) ;;
+  *) fail "Select a local Docker context. This bundle uses files from this computer." ;;
+esac
+
+engine="$(docker info --format '{{.OSType}}/{{.Architecture}}' 2>/dev/null)" ||
+  fail "Start OrbStack or Docker, then run this command again."
+case "$engine" in
+  linux/aarch64|linux/arm64|linux/x86_64|linux/amd64) ;;
+  *) fail "This release supports Linux containers on ARM64 and Intel/AMD64. Docker reports $engine." ;;
+esac
+
+# Once configured, use the saved installation rather than another project's
+# exported Compose settings. Bootstrap overrides are captured by setup above.
+project="$(setting COMPOSE_PROJECT_NAME)"
+unset COMPOSE_PROJECT_NAME OVERLEAF_IMAGE MONGO_IMAGE REDIS_IMAGE
+unset OVERLEAF_LISTEN_IP OVERLEAF_PORT OVERLEAF_SITE_URL OVERLEAF_INVITE_TOKEN_SECRET
+compose=(docker compose --project-name "$project" --project-directory "$bundle_root" --env-file "$bundle_root/.env" -f "$bundle_root/compose.yaml")
+"${compose[@]}" config --quiet
+
+case "$action" in
+  start)
+    echo "Starting your Overleaf installation. The first download is several gigabytes."
+    if ! "${compose[@]}" up -d --wait --wait-timeout 300; then
+      echo "Startup did not complete. Run ./overleaf logs for details." >&2
+      echo "For private image access errors, run ./overleaf login with an authorized account." >&2
+      exit 1
+    fi
+    site="$(setting OVERLEAF_SITE_URL)"
+    printf '\nOverleaf is ready at %s\n' "$site"
+    printf 'On first use, create your administrator account at %s/launchpad\n' "$site"
+    ;;
+  stop) "${compose[@]}" stop --timeout 90 ;;
+  status) "${compose[@]}" ps -a ;;
+  logs) "${compose[@]}" logs --tail 100 --follow ;;
+  pull) "${compose[@]}" pull ;;
+  config) echo "Configuration is valid." ;;
+esac

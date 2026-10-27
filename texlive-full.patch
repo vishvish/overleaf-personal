@@ -1,0 +1,21 @@
+diff --git a/server-ce/Dockerfile-base b/server-ce/Dockerfile-base
+index 33953b504c..c862ec796e 100644
+--- a/server-ce/Dockerfile-base
++++ b/server-ce/Dockerfile-base
+@@ -63,7 +63,7 @@ RUN mkdir /install-tl-unx \
+ &&  echo "tlpdbopt_autobackup 0" >> /install-tl-unx/texlive.profile \
+ &&  echo "tlpdbopt_install_docfiles 0" >> /install-tl-unx/texlive.profile \
+ &&  echo "tlpdbopt_install_srcfiles 0" >> /install-tl-unx/texlive.profile \
+-&&  echo "selected_scheme scheme-basic" >> /install-tl-unx/texlive.profile \
++&&  echo "selected_scheme scheme-full" >> /install-tl-unx/texlive.profile \
+     \
+ &&  /install-tl-unx/install-tl \
+       -profile /install-tl-unx/texlive.profile \
+@@ -79,6 +79,7 @@ RUN mkdir /install-tl-unx \
+ &&  tlmgr path add \
+ &&  rm -rf /install-tl-unx
+ 
++RUN install -m 0644 "$(find /usr/local/texlive -path '*/texmf-var/fonts/conf/texlive-fontconfig.conf' -print -quit)" /etc/fonts/conf.d/09-texlive-fonts.conf
+ 
+ # Set up overleaf user and home directory
+ # -----------------------------------------

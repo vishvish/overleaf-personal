@@ -1,0 +1,73 @@
+services:
+  sharelatex:
+    image: ${OVERLEAF_IMAGE:?Run ./overleaf setup first}
+    restart: "no"
+    ports:
+      - "${OVERLEAF_LISTEN_IP:-127.0.0.1}:${OVERLEAF_PORT:-8080}:80"
+    volumes:
+      - overleaf-data:/var/lib/overleaf
+    environment:
+      OVERLEAF_APP_NAME: Overleaf Community Edition
+      OVERLEAF_SITE_URL: ${OVERLEAF_SITE_URL:?Run ./overleaf setup first}
+      OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex?replicaSet=overleaf
+      OVERLEAF_REDIS_HOST: redis
+      OVERLEAF_REDIS_PORT: "6379"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      V1_HISTORY_URL: http://sharelatex:3100/api
+      OVERLEAF_INVITE_TOKEN_SECRET: ${OVERLEAF_INVITE_TOKEN_SECRET:?Run ./overleaf setup first}
+      ENABLED_LINKED_FILE_TYPES: project_file,project_output_file
+      ENABLE_CONVERSIONS: "true"
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "5", http://127.0.0.1/status]
+      start_period: 60s
+      interval: 10s
+      timeout: 6s
+      retries: 12
+    stop_grace_period: 90s
+
+  mongo:
+    image: ${MONGO_IMAGE:?Run ./overleaf setup first}
+    restart: "no"
+    command: [mongod, --replSet, overleaf, --bind_ip_all]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand({ping:1}).ok === 1 ? 0 : 1)"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+    stop_grace_period: 60s
+
+  mongo-init:
+    image: ${MONGO_IMAGE:?Run ./overleaf setup first}
+    restart: "no"
+    entrypoint: [mongosh, --host, mongo:27017, --quiet, /opt/overleaf/mongo-init.js]
+    volumes:
+      - ./mongo-init.js:/opt/overleaf/mongo-init.js:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  redis:
+    image: ${REDIS_IMAGE:?Run ./overleaf setup first}
+    restart: "no"
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 60s
+
+volumes:
+  overleaf-data:
+  mongo-data:
+  redis-data:
