@@ -5,6 +5,10 @@ installations. The application image includes full TeX Live and supports Apple
 Silicon / ARM64 and Intel / AMD64. A launcher manages Overleaf, MongoDB and Redis
 as one Docker Compose application.
 
+[![Overleaf editor showing project fonts, LaTeX source and a compiled PDF](docs/assets/overleaf-editor.png)](docs/assets/overleaf-editor.png)
+
+*Overleaf running locally with project fonts, LaTeX source and the compiled PDF.*
+
 Each installation creates its own administrator account, project storage and
 private configuration. The source and
 [container image](https://github.com/users/vishvish/packages/container/package/overleaf-personal)
